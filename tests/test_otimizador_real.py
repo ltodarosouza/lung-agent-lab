@@ -101,6 +101,24 @@ class FunnelSimulatedTest(unittest.TestCase):
         funnel, rows = self.run_method("gp", 80)
         self.check_budget_and_log(funnel, rows, 80)
 
+    def test_tpe_respects_budget(self):
+        funnel, rows = self.run_method("tpe", 80)
+        self.check_budget_and_log(funnel, rows, 80)
+
+    def test_tpe_resumes_within_budget_after_a_crash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            _, first = self.run_method("tpe", 80, out=out, crash_after=5)
+            funnel, resumed = self.run_method("tpe", 80, out=out)
+        self.assertEqual(self.stage_trace(resumed)[: len(self.stage_trace(first))], self.stage_trace(first))
+        self.check_budget_and_log(funnel, resumed, 80)
+
+    def test_tpe_receives_values_from_stopped_configs(self):
+        funnel, _ = self.run_method("tpe", 80)
+        pruned = [trial for trial in funnel.optuna_study.trials if trial.state.name == "PRUNED"]
+        self.assertTrue(pruned)
+        self.assertTrue(all(trial.intermediate_values for trial in pruned))
+
 
 if __name__ == "__main__":
     unittest.main()

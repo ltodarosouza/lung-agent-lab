@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Roda GP-BO e depois Nelder-Mead no backend real, um de cada vez (GPU única).
+# Roda os métodos de METHODS no backend real, um de cada vez (GPU única).
 # Só com autorização humana para gerar na GPU. Retoma de onde parou: basta rodar de
 # novo. Cada método tenta até 3 vezes se o processo cair e para de vez na terceira.
 #
@@ -8,7 +8,7 @@
 #   GEN_PYTHON   Python do gerador (torch + monai), usado por run_batch.py
 #   OPT_PYTHON   Python do otimizador (tools/requirements-otimizador.txt)
 #   TEXTURE_EVALUATOR_REPO  clone do avaliador congelado (juiz-v1)
-#   METHODS      padrão "gp nm"
+#   METHODS      padrão "gp nm"; aceita também "tpe"
 set -uo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

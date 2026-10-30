@@ -296,16 +296,23 @@ menor que 27.
   semente fixa (`--seed`, padrão 0). Depois disso, quem propõe é o GP.
 - As restrições entram num modelo de viabilidade separado, que multiplica a aquisição.
   Não são penalidade no objetivo.
-- `--gp-parados podar` (padrão, conforme o pedido): só resultados de 37 casos alimentam o
+- `--parados podar` (padrão, conforme o pedido): só resultados de 37 casos alimentam o
   GP. Configuração parada em 5 ou 10 vira trial `PRUNED`, e o GP não a vê, nem o objetivo
   nem a restrição.
 - Efeito colateral medido no teste: o GP repropõe pontos que já foram podados. Quando
   repropõe uma configuração já medida, o script repete o resultado conhecido (sem custo) e
   a próxima proposta vem da sequência Sobol. O `resumo.json` conta quantas vezes isso
   aconteceu (`repeated`, `sobol_fallback`).
-- `--gp-parados escopo`: alternativa que alimenta o GP com a melhora no escopo em que a
+- `--parados escopo`: alternativa que alimenta o GP com a melhora no escopo em que a
   configuração parou, como no Nelder-Mead. Fica documentada para comparação; não é o
   padrão.
+
+**TPE** (Optuna `TPESampler`, `multivariate=True`, `constraints_func`):
+
+- Usa o mesmo laço e os mesmos pontos iniciais do GP-BO: baseline mais 4 pontos Sobol.
+- Com `--parados podar`, a configuração parada vira trial `PRUNED` com a melhora do escopo
+  como valor intermediário. O TPE usa esse valor, ao contrário do GP.
+- As restrições seguem o tratamento do `constraints_func`, sem penalidade no objetivo.
 
 **Nelder-Mead** (scipy, `bounds` [0,1]^5):
 

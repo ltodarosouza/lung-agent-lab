@@ -8,6 +8,7 @@ baseline fixo não são tocados.
 Métodos, com o mesmo orçamento em casos gerados:
 - `gp`: GP-BO com restrições (Optuna `GPSampler` + `constraints_func`).
 - `nm`: Nelder-Mead determinístico (scipy, com bounds e simplex inicial fixo).
+- `tpe`: TPE multivariado com restrições (Optuna `TPESampler` + `constraints_func`).
 
 Subcomandos:
     otimizar   roda um método (backend `simulado` por padrão; `real` exige --confirmo-gpu)
@@ -355,29 +356,29 @@ def sobol_points(dim: int, seed: int, count: int):
     return sampler.random(count).tolist()
 
 
-def run_gp(funnel: Funnel, space: Space, baseline: dict, seed: int, stopped_mode: str) -> dict:
-    """GP-BO com restrições.
+def run_optuna(funnel: Funnel, space: Space, baseline: dict, seed: int, stopped_mode: str,
+               make_sampler) -> dict:
+    """Laço ask/tell dos métodos Optuna, com restrições.
 
     Pontos iniciais: baseline (custo 0) + 4 pontos Sobol (semente fixa). Depois, o
-    GPSampler propõe. Restrições: rejeições ≤ 0 e pares fora de ok ≤ 0, via
+    sampler propõe. Restrições: rejeições ≤ 0 e pares fora de ok ≤ 0, via
     `constraints_func` (modelo de viabilidade separado, não penalidade no objetivo).
 
-    `stopped_mode` decide o que o GP vê de uma configuração parada em 5 ou 10 casos:
-    - `podar` (padrão): nada; o trial é PRUNED e só resultados de 37 alimentam o GP.
-    - `escopo`: a melhora no escopo em que parou, como no Nelder-Mead.
-    Se o GP repropõe uma configuração já medida, o resultado conhecido é repetido (sem
-    custo) e a próxima proposta vem da sequência Sobol, para não girar em falso.
-    Na retomada, as propostas do log são reenfileiradas na ordem original, para o GP
+    `stopped_mode` decide como uma configuração parada em 5 ou 10 casos entra no estudo:
+    - `podar` (padrão): trial PRUNED com a melhora do escopo como valor intermediário. O
+      GP ignora trials podados, e o TPE os ordena pelo escopo e por esse valor.
+    - `escopo`: a melhora no escopo em que parou vira o objetivo, como no Nelder-Mead.
+    Se o sampler repropõe uma configuração já medida, o resultado conhecido é repetido
+    (sem custo) e a próxima proposta vem da sequência Sobol, para não girar em falso.
+    Na retomada, as propostas do log são reenfileiradas na ordem original, para o sampler
     reconstruir o mesmo histórico antes de propor algo novo.
     """
     import optuna
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
-    sampler = optuna.samplers.GPSampler(
-        seed=seed, n_startup_trials=1,
-        constraints_func=lambda trial: trial.user_attrs["constraints"],
-    )
+    sampler = make_sampler(optuna, seed, lambda trial: trial.user_attrs["constraints"])
     study = optuna.create_study(direction="maximize", sampler=sampler)
+    funnel.optuna_study = study
     names = [f"u_{name}" for name in space.free]
     sobol = sobol_points(len(names), seed, 64)
     initial = [space.encode(baseline)] + sobol[:N_SOBOL_INITIAL]
@@ -404,6 +405,7 @@ def run_gp(funnel: Funnel, space: Space, baseline: dict, seed: int, stopped_mode
         if result["full"] or stopped_mode == "escopo":
             study.tell(trial, result["value"])
         else:
+            trial.report(result["value"], step=SCOPE_SIZE[result["scope"]])
             study.tell(trial, state=optuna.trial.TrialState.PRUNED)
         if repeated:
             stats["repeated"] += 1
@@ -412,6 +414,23 @@ def run_gp(funnel: Funnel, space: Space, baseline: dict, seed: int, stopped_mode
                 stats["sobol_fallback"] += 1
                 study.enqueue_trial(dict(zip(names, point)))
     return stats
+
+
+def run_gp(funnel: Funnel, space: Space, baseline: dict, seed: int, stopped_mode: str) -> dict:
+    """GP-BO com restrições (`GPSampler`)."""
+    def make_sampler(optuna, seed, constraints):
+        return optuna.samplers.GPSampler(seed=seed, n_startup_trials=1, constraints_func=constraints)
+
+    return run_optuna(funnel, space, baseline, seed, stopped_mode, make_sampler)
+
+
+def run_tpe(funnel: Funnel, space: Space, baseline: dict, seed: int, stopped_mode: str) -> dict:
+    """TPE multivariado com restrições; os pontos iniciais são os mesmos do GP."""
+    def make_sampler(optuna, seed, constraints):
+        return optuna.samplers.TPESampler(seed=seed, n_startup_trials=N_SOBOL_INITIAL + 1, multivariate=True,
+                                          constraints_func=constraints)
+
+    return run_optuna(funnel, space, baseline, seed, stopped_mode, make_sampler)
 
 
 def run_nm(funnel: Funnel, space: Space, baseline: dict, seed: int, stopped_mode: str) -> dict:
@@ -453,8 +472,9 @@ def run_nm(funnel: Funnel, space: Space, baseline: dict, seed: int, stopped_mode
     return stats
 
 
-METHODS = {"gp": run_gp, "nm": run_nm}
-METHOD_PREFIX = {"gp": "gpbo", "nm": "nm"}
+METHODS = {"gp": run_gp, "nm": run_nm, "tpe": run_tpe}
+METHOD_PREFIX = {"gp": "gpbo", "nm": "nm", "tpe": "tpe"}
+OPTUNA_METHODS = ("gp", "tpe")
 
 
 # --- subcomandos --------------------------------------------------------------
@@ -488,14 +508,14 @@ def cmd_otimizar(args) -> None:
         out_root = (args.out_root or ROOT / "runs" / "otimizador-simulado" / tag).resolve()
         backend = SimulatedBackend(out_root, baseline)
     header = {"backend": backend.name, "budget": args.budget, "seed": args.seed,
-              "gp_parados": args.gp_parados if args.method == "gp" else None,
+              "parados": args.parados if args.method in OPTUNA_METHODS else None,
               "nm_initial_step": NM_INITIAL_STEP if args.method == "nm" else None,
-              "n_sobol_initial": N_SOBOL_INITIAL if args.method == "gp" else None}
+              "n_sobol_initial": N_SOBOL_INITIAL if args.method in OPTUNA_METHODS else None}
     funnel = Funnel(backend, space, baseline, out_root, prefix, args.budget, args.method, header)
     funnel.crash_after = args.simular_queda
     original_candidate = CANDIDATE_PATH.read_text(encoding="utf-8") if CANDIDATE_PATH.exists() else None
     try:
-        stats = METHODS[args.method](funnel, space, baseline, args.seed, args.gp_parados)
+        stats = METHODS[args.method](funnel, space, baseline, args.seed, args.parados)
     finally:
         if original_candidate is not None and args.backend == "real":
             CANDIDATE_PATH.write_text(original_candidate, encoding="utf-8")
@@ -504,7 +524,7 @@ def cmd_otimizar(args) -> None:
         "configs_measured": funnel.index, "best": funnel.best["candidate"],
         "best_full_improvement_pct": funnel.best["improvement"],
         "best_reports": {scope: str(path) for scope, path in funnel.best["paths"].items()},
-        "seed": args.seed, "gp_parados": args.gp_parados if args.method == "gp" else None,
+        "seed": args.seed, "parados": args.parados if args.method in OPTUNA_METHODS else None,
         "nm_initial_step": NM_INITIAL_STEP if args.method == "nm" else None,
         "stats": stats,
     }
@@ -612,8 +632,8 @@ def main() -> None:
     opt.add_argument("--dry-run", action="store_true",
                      help="com --backend real: mostra o primeiro comando de geração e para, sem gerar nada")
     opt.add_argument("--budget", type=int, default=DEFAULT_BUDGET, help="casos gerados (não configurações)")
-    opt.add_argument("--seed", type=int, default=0, help="semente do otimizador (Sobol e GP), não da geração")
-    opt.add_argument("--gp-parados", choices=("podar", "escopo"), default="podar")
+    opt.add_argument("--seed", type=int, default=0, help="semente do otimizador (Sobol, GP e TPE), não da geração")
+    opt.add_argument("--parados", choices=("podar", "escopo"), default="podar")
     opt.add_argument("--tag", help="só para simulado e dry-run: nome da pasta")
     opt.add_argument("--out-root", type=Path,
                      help="onde criar <prefixo>-NN-<escopo> e <prefixo>-log.jsonl (real: runs/real)")
