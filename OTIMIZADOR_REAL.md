@@ -423,6 +423,13 @@ uma de duas coisas, e Matheus decide qual:
 Custo: (3 configurações + baseline) × 37 casos × número de seeds, ou seja, 148 casos por
 seed.
 
+## Âncoras em outro ambiente
+
+Mudar torch, MONAI ou GPU muda as imagens, então números de ambientes diferentes não se
+comparam. `tools/otimizador_real.py ancoras --confirmo-gpu` regenera o baseline nos três
+escopos e a M12, o `gpbo-11` e o `nm-21` em 37 casos, pula relatórios completos e escreve
+`ancoras.json`. Essas medidas ficam fora do orçamento, como o baseline.
+
 ## Teste de ponta a ponta (backend simulado)
 
 `tools/otimizador_simulado.py` escreve relatórios no formato de `run_batch.py`. As

@@ -36,6 +36,36 @@ class SpaceTest(unittest.TestCase):
         self.assertEqual((high["steps"], high["noise_level"]), (100, 349))
 
 
+class AnchorsTest(unittest.TestCase):
+    def setUp(self):
+        import otimizador_real as runner
+
+        self.runner = runner
+
+    def test_baseline_commands_reuse_the_previous_scope(self):
+        commands = self.runner.baseline_commands(Path("py"), Path("/r"))
+        self.assertEqual([report.parent.name for report, _ in commands],
+                         ["baseline-screen", "baseline-quick", "baseline-full"])
+        self.assertNotIn("--reuse-report", commands[0][1])
+        self.assertEqual(commands[2][1][commands[2][1].index("--reuse-report") + 1],
+                         "/r/baseline-quick/report.json")
+
+    def test_anchors_are_valid_candidates(self):
+        rules = json.loads(self.runner.SPACE_PATH.read_text(encoding="utf-8"))
+        self.assertEqual(set(self.runner.ANCHORS), {"m12", "gpbo-11", "nm-21"})
+        for candidate in self.runner.ANCHORS.values():
+            self.assertEqual(self.runner.validate_candidate(candidate, rules), candidate)
+
+    def test_completed_report_is_not_regenerated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            report = Path(tmp) / "report.json"
+            self.assertFalse(self.runner.report_completed(report))
+            report.write_text(json.dumps({"completed": False}), encoding="utf-8")
+            self.assertFalse(self.runner.report_completed(report))
+            report.write_text(json.dumps({"completed": True}), encoding="utf-8")
+            self.assertTrue(self.runner.report_completed(report))
+
+
 @unittest.skipUnless(HAS_DEPS, "scipy e optuna são opcionais")
 class FunnelSimulatedTest(unittest.TestCase):
     def run_method(self, method, budget, out=None, crash_after=None):

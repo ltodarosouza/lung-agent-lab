@@ -14,6 +14,7 @@ Subcomandos:
     otimizar   roda um método (backend `simulado` por padrão; `real` exige --confirmo-gpu)
     orcamento  conta os casos gerados pela busca M4–M12 a partir de runs/real
     agente     converte os relatórios M4–M12 para o mesmo formato de log
+    ancoras    regenera o baseline e as melhores configurações em 37 casos (exige --confirmo-gpu)
     curva      junta logs numa curva melhor melhora (37 casos) × casos gerados
 
 Veja OTIMIZADOR_REAL.md para as decisões de desenho e como rodar no real.
@@ -46,6 +47,16 @@ SCOPE_SIZE = {"screen": 5, "quick": 10, "full": 37}
 # Busca M do agente no CADERNO = candidate-04 … candidate-12 em runs/real.
 AGENT_CANDIDATES = range(4, 13)
 DEFAULT_BUDGET = 269  # ver `orcamento`: 7 × (5 + 5 + 27) + 2 × 5
+FROZEN = {"sampler": "ddim", "scale_factor": 1.0, "seed": 42}
+# Melhores configurações já medidas, regeneradas para comparar dentro de um mesmo ambiente.
+ANCHORS = {
+    "m12": {**FROZEN, "steps": 35, "noise_level": 1, "eta": 0.4,
+            "latent_noise_scale": 1.0, "conditioning_noise_scale": 1.4},
+    "gpbo-11": {**FROZEN, "steps": 43, "noise_level": 2, "eta": 0.767,
+                "latent_noise_scale": 0.75, "conditioning_noise_scale": 1.5},
+    "nm-21": {**FROZEN, "steps": 29, "noise_level": 1, "eta": 0.068,
+              "latent_noise_scale": 1.008, "conditioning_noise_scale": 1.02},
+}
 
 
 class BudgetExhausted(Exception):
@@ -582,6 +593,64 @@ def cmd_agente(args) -> None:
     print(f"{len(rows) - 1} etapas, {used} casos gerados, melhor em 37 casos: {best:+.2f}%  → {args.out}")
 
 
+def report_completed(path: Path) -> bool:
+    if not path.exists():
+        return False
+    return bool(json.loads(path.read_text(encoding="utf-8")).get("completed"))
+
+
+def baseline_commands(python: Path, out_root: Path) -> list:
+    """Baseline cumulativo 5 → 10 → 37, como no README: (relatório esperado, comando)."""
+    commands = []
+    previous = None
+    for scope in SCOPES:
+        report = out_root / f"baseline-{scope}" / "report.json"
+        command = [str(python), str(ROOT / "generator" / "run_batch.py"), "--scope", scope,
+                   "--config", str(BASELINE_PATH), "--output-dir", str(report.parent)]
+        if previous is not None:
+            command += ["--reuse-report", str(previous)]
+        commands.append((report, command))
+        previous = report
+    return commands
+
+
+def cmd_ancoras(args) -> None:
+    if not args.confirmo_gpu:
+        raise SystemExit("ancoras gera imagens na GPU: só rode com --confirmo-gpu, após autorização humana")
+    if git_branch() in ("main", "master"):
+        raise SystemExit("a exceção ao protocolo vale só no branch do experimento, não no main")
+    out_root = args.out_root.resolve()
+    out_root.mkdir(parents=True, exist_ok=True)
+    # abspath, não resolve(): o Python do venv é symlink e precisa do caminho do ambiente
+    python = Path(os.path.abspath(args.python))
+    commands = baseline_commands(python, out_root)
+    for report, command in commands:
+        if not report_completed(report):
+            subprocess.run(command, check=True, cwd=ROOT)
+    baseline_report = commands[-1][0]
+    reports = {"baseline": baseline_report}
+    for name, candidate in ANCHORS.items():
+        run_dir = out_root / f"ancora-{name}"
+        reports[name] = run_dir / "report.json"
+        if report_completed(reports[name]):
+            continue
+        config = out_root / f"ancora-{name}.json"
+        config.write_text(json.dumps(candidate, indent=2) + "\n", encoding="utf-8")
+        subprocess.run([str(python), str(ROOT / "generator" / "run_batch.py"), "--scope", "full",
+                        "--config", str(config), "--baseline", str(baseline_report),
+                        "--output-dir", str(run_dir)], check=True, cwd=ROOT)
+    summary = {}
+    for name, path in reports.items():
+        report = load_report(path)
+        facts = report_facts(report)
+        summary[name] = {"candidate": report["candidate"], "score": report["summary"]["score"],
+                         "mean_improvement_pct": report.get("comparison", {}).get("mean_improvement_pct"),
+                         "rejected": facts["rejected"], "pair_issues": facts["pair_issues"],
+                         "report": str(path)}
+    (out_root / "ancoras.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(json.dumps(summary, indent=2, ensure_ascii=False))
+
+
 def cmd_curva(args) -> None:
     curves = {}
     for path in args.logs:
@@ -650,6 +719,12 @@ def main() -> None:
     agent.add_argument("--runs-real", type=Path, default=ROOT / "runs" / "real")
     agent.add_argument("--out", type=Path, default=ROOT / "runs" / "otimizador-curvas" / "agente" / "log.jsonl")
     agent.set_defaults(func=cmd_agente)
+
+    anchors = sub.add_parser("ancoras")
+    anchors.add_argument("--confirmo-gpu", action="store_true", help="obrigatório: gera imagens na GPU")
+    anchors.add_argument("--python", type=Path, default=ROOT / ".venv" / "bin" / "python")
+    anchors.add_argument("--out-root", type=Path, default=ROOT / "runs" / "real")
+    anchors.set_defaults(func=cmd_ancoras)
 
     curve = sub.add_parser("curva")
     curve.add_argument("logs", type=Path, nargs="+")
