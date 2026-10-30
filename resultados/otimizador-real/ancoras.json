@@ -1,0 +1,70 @@
+{
+  "baseline": {
+    "candidate": {
+      "steps": 25,
+      "noise_level": 1,
+      "sampler": "ddim",
+      "scale_factor": 1.0,
+      "seed": 42,
+      "eta": 0.0,
+      "latent_noise_scale": 1.0,
+      "conditioning_noise_scale": 1.0
+    },
+    "score": 68.9605,
+    "mean_improvement_pct": null,
+    "rejected": 0,
+    "pair_issues": 0,
+    "report": "/home/seringas/lung-agent-lab/runs/real/baseline-full/report.json"
+  },
+  "m12": {
+    "candidate": {
+      "steps": 35,
+      "noise_level": 1,
+      "sampler": "ddim",
+      "scale_factor": 1.0,
+      "seed": 42,
+      "eta": 0.4,
+      "latent_noise_scale": 1.0,
+      "conditioning_noise_scale": 1.4
+    },
+    "score": 76.7688,
+    "mean_improvement_pct": 23.0664,
+    "rejected": 0,
+    "pair_issues": 0,
+    "report": "/home/seringas/lung-agent-lab/runs/real/ancora-m12/report.json"
+  },
+  "gpbo-11": {
+    "candidate": {
+      "steps": 43,
+      "noise_level": 2,
+      "sampler": "ddim",
+      "scale_factor": 1.0,
+      "seed": 42,
+      "eta": 0.767,
+      "latent_noise_scale": 0.75,
+      "conditioning_noise_scale": 1.5
+    },
+    "score": 85.7975,
+    "mean_improvement_pct": 44.1547,
+    "rejected": 0,
+    "pair_issues": 0,
+    "report": "/home/seringas/lung-agent-lab/runs/real/ancora-gpbo-11/report.json"
+  },
+  "nm-21": {
+    "candidate": {
+      "steps": 29,
+      "noise_level": 1,
+      "sampler": "ddim",
+      "scale_factor": 1.0,
+      "seed": 42,
+      "eta": 0.068,
+      "latent_noise_scale": 1.008,
+      "conditioning_noise_scale": 1.02
+    },
+    "score": 75.4313,
+    "mean_improvement_pct": 24.47,
+    "rejected": 0,
+    "pair_issues": 0,
+    "report": "/home/seringas/lung-agent-lab/runs/real/ancora-nm-21/report.json"
+  }
+}

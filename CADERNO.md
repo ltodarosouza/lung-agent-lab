@@ -194,3 +194,8 @@ O que este experimento ensina para a próxima busca:
   refeita aqui).
 - **Custo da exploração:** o GP gastou 45% do orçamento (120 casos) em etapas com
   rejeição, e o agente gastou 5 casos.
+
+Rodado em 2026-10-30 na ARIA: TPE (OT13) com steps 41, noise 0, eta 0,846, latent 0,788,
+cond 1,26 deu +42,94%, nota 85,30, textura 33/37 e final 28/37, em 161 casos. No mesmo ambiente,
+OG11 deu +44,15%, nota 85,80, textura 34/37 e final 29/37, vencendo 23 de 37 cortes contra OT13.
+A "Melhor atual" **não mudou**. Detalhes em `OTIMIZADOR_REAL.md`.

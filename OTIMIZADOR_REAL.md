@@ -423,6 +423,41 @@ uma de duas coisas, e Matheus decide qual:
 Custo: (3 configurações + baseline) × 37 casos × número de seeds, ou seja, 148 casos por
 seed.
 
+## Resultado do TPE na ARIA (2026-10-30, seed 42)
+
+Executado com Optuna 5.0.0, Python 3.12, PyTorch 2.7.1+cu128 e MONAI 1.4.0 numa RTX PRO
+6000 Blackwell, no commit `637ec7c`. Os 268 casos levaram 13 min 51 s, cerca de 3 s por caso.
+Logs: `resultados/otimizador-real/tpe-log.jsonl`, `tpe-resumo.json` e `ancoras.json`.
+
+As âncoras reproduziram o lab: baseline 68,96 (lab 68,92), M12 76,77 (76,73), `gpbo-11`
+85,80 (85,79) e `nm-21` 75,43 (75,41), sem rejeições nem pares inválidos.
+
+| 37 casos, ARIA | GP-BO `gpbo-11` | TPE `tpe-13` |
+|---|---|---|
+| steps / noise / eta | 43 / 2 / 0,767 | 41 / 0 / 0,846 |
+| latent / cond | 0,75 / 1,5 | 0,788 / 1,26 |
+| melhora média (teto 50) | +44,15% | +42,94% |
+| nota | 85,80 | 85,30 |
+| final aprovada / revisar | 29 / 8 | 28 / 9 |
+| textura aprovada | 34 / 37 | 33 / 37 |
+| NEx ok | 32 | 31 |
+| vitórias / derrotas vs baseline | n/d | 30 / 7 |
+| melhor atingido em | 119 casos | 161 casos |
+| casos em etapas com rejeição | 120 (lab) | 20 |
+
+Frente a frente por nota de corte, o `gpbo-11` vence 23 e o `tpe-13` vence 14. A diferença
+não sustenta superioridade de nenhum dos dois com uma seed. O TPE mediu 28 configurações e
+4 chegaram a 37 casos. A `tpe-27` deu +42,96%, mas perdeu da `tpe-13` por corte (17 / 20).
+
+O TPE chegou à mesma região do GP-BO por outro caminho: `latent` 0,77–0,87, `eta` 0,69–0,86
+e `noise_level` 0, mas com `latent` e `cond` dentro do espaço, não na borda.
+
+Ruído no ar, na métrica da seção de ressalvas, nos 27 cortes gerados em `tpe-13-full`:
+baseline 1,36, `tpe-13` 1,76 e `gpbo-11` 1,98. O excesso cai, mas não some.
+
+As ressalvas de seed única, seleção entre candidatos, teto das métricas, ausência de revisão
+clínica e split de teste valem igualmente para o TPE.
+
 ## Âncoras em outro ambiente
 
 Mudar torch, MONAI ou GPU muda as imagens, então números de ambientes diferentes não se

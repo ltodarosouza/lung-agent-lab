@@ -1,0 +1,31 @@
+{
+  "method": "tpe",
+  "backend": "real",
+  "budget": 269,
+  "cases_used": 268,
+  "configs_measured": 28,
+  "best": {
+    "steps": 41,
+    "noise_level": 0,
+    "sampler": "ddim",
+    "scale_factor": 1.0,
+    "seed": 42,
+    "eta": 0.846,
+    "latent_noise_scale": 0.788,
+    "conditioning_noise_scale": 1.26
+  },
+  "best_full_improvement_pct": 42.9432,
+  "best_reports": {
+    "screen": "/home/seringas/lung-agent-lab/runs/real/tpe-13-screen/report.json",
+    "quick": "/home/seringas/lung-agent-lab/runs/real/tpe-13-quick/report.json",
+    "full": "/home/seringas/lung-agent-lab/runs/real/tpe-13-full/report.json"
+  },
+  "seed": 0,
+  "parados": "podar",
+  "nm_initial_step": null,
+  "stats": {
+    "proposals": 30,
+    "repeated": 0,
+    "sobol_fallback": 0
+  }
+}
