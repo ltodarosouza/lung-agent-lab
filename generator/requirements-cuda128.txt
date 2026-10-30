@@ -1,0 +1,12 @@
+# Ambiente da ARIA (Blackwell, Python 3.12). torch 2.0.1 não suporta essa GPU, e
+# MONAI 1.2.0/1.3.0 não importam no Python 3.12.
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.7.1+cu128
+torchvision==0.22.1+cu128
+monai==1.4.0
+monai-generative==0.2.2
+omegaconf==2.3.0
+numpy==1.26.4
+pillow==12.3.0
+tifffile==2025.5.10
+tqdm==4.70.1

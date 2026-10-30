@@ -74,7 +74,7 @@ def main() -> None:
     parser.add_argument("--baseline", type=Path, help="relatório do baseline do mesmo escopo; régua fixa da comparação")
     parser.add_argument("--compare-to", type=Path, help="no lote completo, relatório da melhor configuração atual")
     parser.add_argument("--reuse-report", type=Path)
-    parser.add_argument("--device", choices=("auto", "cpu", "mps"), default="auto")
+    parser.add_argument("--device", choices=("auto", "cpu", "cuda", "mps"), default="auto")
     args = parser.parse_args()
 
     ensure_evaluator_ready()
